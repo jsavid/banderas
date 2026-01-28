@@ -21,7 +21,7 @@ const SoundManager = {
     playWin: () => {
         // Major Arpeggio
         const now = audioCtx.currentTime;
-        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => { // C Major
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.frequency.value = freq;
@@ -44,10 +44,10 @@ const SoundManager = {
 
 // Game State
 let currentScore = 0;
-let highScore = parseInt(localStorage.getItem('flagQuizHighScore')) || 0;
 let remainingCountries = [];
 let currentQuestion = null;
 let isAnswered = false;
+let continentStats = {};
 
 // DOM Elements
 const scoreEl = document.getElementById('score');
@@ -55,6 +55,8 @@ const countEl = document.getElementById('count');
 const gameContainer = document.getElementById('game-container');
 const gameOverSection = document.getElementById('game-over');
 const finalScoreVal = document.getElementById('final-score-value');
+const statsBreakdown = document.getElementById('stats-breakdown');
+const finalMessage = document.getElementById('final-message');
 const restartBtn = document.getElementById('restart-btn');
 const flagImg = document.getElementById('flag-img');
 const continentHint = document.getElementById('continent-hint');
@@ -67,6 +69,15 @@ const flashOverlay = document.getElementById('flash-overlay');
 function init() {
     remainingCountries = [...countries];
     currentScore = 0;
+
+    // Reset Stats
+    continentStats = {};
+    countries.forEach(c => {
+        if (!continentStats[c.continent]) {
+            continentStats[c.continent] = { correct: 0, total: 0 };
+        }
+    });
+
     updateScoreUI();
 
     // UI Reset
@@ -97,11 +108,41 @@ function triggerFlash(type) {
 function endGame() {
     gameContainer.classList.add('hidden');
     gameOverSection.classList.remove('hidden');
-    finalScoreVal.textContent = currentScore;
 
-    // Confetti or extra sound could go here
+    const totalQuestions = countries.length;
+    const percentage = Math.round((currentScore / totalQuestions) * 100);
+
+    finalScoreVal.textContent = `${percentage}%`;
+
+    // Set Message
+    let msg = "";
+    if (percentage === 100) msg = "¡Perfecto!";
+    else if (percentage >= 90) msg = "¡Épico!";
+    else if (percentage >= 80) msg = "¡Muy bueno!";
+    else if (percentage >= 70) msg = "Bien";
+    else if (percentage >= 60) msg = "Aceptable";
+    else msg = "Falta practicar más";
+
+    finalMessage.textContent = msg;
+
+    // Render Stats
+    statsBreakdown.innerHTML = '';
+    const sortedContinents = Object.keys(continentStats).sort();
+
+    sortedContinents.forEach(cont => {
+        const data = continentStats[cont];
+        let contPercent = data.total === 0 ? 0 : Math.round((data.correct / data.total) * 100);
+
+        const row = document.createElement('div');
+        row.className = 'stat-row';
+        row.innerHTML = `
+            <span class="continent-name">${cont}</span>
+            <span class="continent-score">${contPercent}% (${data.correct}/${data.total})</span>
+        `;
+        statsBreakdown.appendChild(row);
+    });
+
     SoundManager.playWin();
-    SoundManager.playWin(); // Double celebrate
 }
 
 function generateQuestion() {
@@ -116,24 +157,23 @@ function generateQuestion() {
     optionsContainer.innerHTML = '';
     flagImg.style.opacity = '0';
 
-    // Pick Random from REMAINING
+    // Pick Random
     const randomIndex = Math.floor(Math.random() * remainingCountries.length);
     const correctCountry = remainingCountries[randomIndex];
 
-    // Remove from pool
+    // Track attempt for this continent (we track total here)
+    continentStats[correctCountry.continent].total++;
+
     remainingCountries.splice(randomIndex, 1);
     updateScoreUI();
 
-    // Find Distractors (Same Continent) from FULL list (distractors can repeat)
+    // Distractors
     const sameContinent = countries.filter(c =>
         c.continent === correctCountry.continent && c.code !== correctCountry.code
     );
 
-    // Shuffle and pick 5 distractors
     const shuffledDistractors = sameContinent.sort(() => 0.5 - Math.random());
     const distractors = shuffledDistractors.slice(0, 5);
-
-    // Combine and Shuffle Options
     const options = [correctCountry, ...distractors].sort(() => 0.5 - Math.random());
 
     currentQuestion = {
@@ -141,7 +181,7 @@ function generateQuestion() {
         options: options
     };
 
-    // Render DOM
+    // Render
     const img = new Image();
     img.onload = () => {
         flagImg.src = img.src;
@@ -156,9 +196,7 @@ function generateQuestion() {
         btn.className = 'option-btn';
         btn.textContent = country.name;
         btn.dataset.code = country.code;
-
         btn.addEventListener('click', () => handleAnswer(country, btn));
-
         optionsContainer.appendChild(btn);
     });
 }
@@ -168,11 +206,15 @@ function handleAnswer(selectedCountry, btnElement) {
     isAnswered = true;
 
     const correctCode = currentQuestion.correct.code;
+    const continent = currentQuestion.correct.continent;
     const allButtons = optionsContainer.querySelectorAll('.option-btn');
 
     if (selectedCountry.code === correctCode) {
         // Correct
         currentScore++;
+        // Track unique success (we already tracked total in generate)
+        continentStats[continent].correct++;
+
         SoundManager.playWin();
         triggerFlash('correct');
         btnElement.classList.add('correct');
@@ -184,7 +226,6 @@ function handleAnswer(selectedCountry, btnElement) {
         triggerFlash('wrong');
         btnElement.classList.add('wrong');
 
-        // Highlight correct
         allButtons.forEach(btn => {
             if (btn.dataset.code === correctCode) {
                 btn.classList.add('correct');
@@ -199,5 +240,4 @@ function handleAnswer(selectedCountry, btnElement) {
     nextBtn.focus();
 }
 
-// Start Game
 init();
