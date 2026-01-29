@@ -65,14 +65,19 @@ const feedbackArea = document.getElementById('feedback');
 const nextBtn = document.getElementById('next-btn');
 const flashOverlay = document.getElementById('flash-overlay');
 
+const TOTAL_QUESTIONS = 20;
+
 // Initialize
 function init() {
-    remainingCountries = [...countries];
+    // Shuffle and pick 20
+    const shuffled = [...countries].sort(() => 0.5 - Math.random());
+    remainingCountries = shuffled.slice(0, TOTAL_QUESTIONS);
     currentScore = 0;
 
     // Reset Stats
     continentStats = {};
-    countries.forEach(c => {
+    // We only care about stats for the selected 20 countries
+    remainingCountries.forEach(c => {
         if (!continentStats[c.continent]) {
             continentStats[c.continent] = { correct: 0, total: 0 };
         }
@@ -92,7 +97,9 @@ function init() {
 
 function updateScoreUI() {
     scoreEl.textContent = currentScore;
-    countEl.textContent = `${countries.length - remainingCountries.length}/${countries.length}`;
+    // Calculate progress based on remaining countries relative to TOTAL_QUESTIONS
+    const answeredCount = TOTAL_QUESTIONS - remainingCountries.length;
+    countEl.textContent = `${answeredCount}/${TOTAL_QUESTIONS}`;
 }
 
 function triggerFlash(type) {
@@ -109,19 +116,23 @@ function endGame() {
     gameContainer.classList.add('hidden');
     gameOverSection.classList.remove('hidden');
 
-    const totalQuestions = countries.length;
-    const percentage = Math.round((currentScore / totalQuestions) * 100);
+    const percentage = Math.round((currentScore / TOTAL_QUESTIONS) * 100);
 
     finalScoreVal.textContent = `${percentage}%`;
 
     // Set Message
     let msg = "";
-    if (percentage === 100) msg = "¡Perfecto!";
-    else if (percentage >= 90) msg = "¡Épico!";
-    else if (percentage >= 80) msg = "¡Muy bueno!";
-    else if (percentage >= 70) msg = "Bien";
-    else if (percentage >= 60) msg = "Aceptable";
-    else msg = "Falta practicar más";
+    if (percentage === 100) msg = "¡Perfecto! 😎 🏆 (¡Nivel leyenda!)";
+    else if (percentage >= 90) msg = "¡Excelente! 😃 ⭐ (¡Casi impecable!)";
+    else if (percentage >= 80) msg = "¡Muy bien! 😄 ✨ (¡Sigue así!)";
+    else if (percentage >= 70) msg = "¡Bien! 🙂 👍 (Vas por buen camino)";
+    else if (percentage >= 60) msg = "Más o menos... 🙃 ⚖️ (Apenas raspando)";
+    else if (percentage >= 50) msg = "¡Flojo! 🤨 ⚠️ (Necesitas apretar un poco más)";
+    else if (percentage >= 40) msg = "¡Mal! 🤔 📉 (Hay que replantear la estrategia)";
+    else if (percentage >= 30) msg = "¡Muy mal! 🥺 🆘 (¡Alerta roja!)";
+    else if (percentage >= 20) msg = "¡Horrible! 🙄 🤦♂️ (Ni para qué te cuento...)";
+    else if (percentage >= 10) msg = "¡Espantoso! 🫠 🌋 (Desastre total)";
+    else msg = "¡Sin palabras! 🤯 💀 (¿Qué pasó aquí?)";
 
     finalMessage.textContent = msg;
 
@@ -131,15 +142,18 @@ function endGame() {
 
     sortedContinents.forEach(cont => {
         const data = continentStats[cont];
-        let contPercent = data.total === 0 ? 0 : Math.round((data.correct / data.total) * 100);
+        // Only show continents that actually appeared in the game
+        if (data.total > 0) {
+            let contPercent = Math.round((data.correct / data.total) * 100);
 
-        const row = document.createElement('div');
-        row.className = 'stat-row';
-        row.innerHTML = `
-            <span class="continent-name">${cont}</span>
-            <span class="continent-score">${contPercent}% (${data.correct}/${data.total})</span>
-        `;
-        statsBreakdown.appendChild(row);
+            const row = document.createElement('div');
+            row.className = 'stat-row';
+            row.innerHTML = `
+                <span class="continent-name">${cont}</span>
+                <span class="continent-score">${contPercent}% (${data.correct}/${data.total})</span>
+            `;
+            statsBreakdown.appendChild(row);
+        }
     });
 
     SoundManager.playWin();
